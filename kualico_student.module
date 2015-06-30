@@ -1,0 +1,360 @@
+<?php
+/**
+  * @file
+  * Module that will import classes from KualiCo Student API
+  */
+
+/**
+  * Implements hook_help()
+  * Displays hepl and module information
+  *
+  * @param path
+  * Which path of the site we're using to display this help
+  * @param arg
+  * Array that holds the current path as returned from arg() function
+  */
+function kualico_student_menu() {
+  $items = array();
+
+  $items['admin/config/content/kualico_student'] = array(
+    'title' => 'KualiCo Student',
+    'description' => 'Configuration of the KualiCo Student Module',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('kualico_student_config_form'),
+    'access arguments' => array('access administration pages'),
+    'type' => MENU_NORMAL_ITEM
+    );
+  $items['kualico_student'] = array(
+    'title' => 'KualiCo Student',
+    'page callback' => '_kualico_student_page',
+    'access arguments' => array('access kualico_student content'),
+    'type' => MENU_NORMAL_ITEM, //Will appear in navigation menu
+    );
+  $items['kualico_student_filter_form'] = array(
+    'type' => MENU_CALLBACK,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('kualico_student_filter_form')
+  );
+  $items['kualico_student/kualico_student_course_view'] = array(
+    'title' => 'Course View',
+    'page callback' => '_kualico_student_course_view',
+    'access arguments' => array('acces kualico_student content'),
+    'type' => MENU_CALLBACK,
+  );
+  return $items;
+}
+
+function kualico_student_config_form($form, &$form_state) {
+  $form['kualico_student_api_url'] = array(
+    '#type' => 'textfield',
+    '#title' => t('API Url'),
+    '#default_value' => variable_get(
+      'kualico_student_api_url',
+      'example: http://monsters.cm.kuali.dev/api'
+    ),
+    '#size' => 64,
+    '#description' => t('Enter your API URL'),
+    '#required' => TRUE
+  );
+
+  $form['kualico_student_x_token'] = array(
+    '#type' => 'textfield',
+    '#title' => t('API Key'),
+    '#default_value' => 'View your API-key in your KualiStudent Profile',
+    '#size' => 64,
+    '#maxlength' => 64,
+    '#description' => t('Enter your API key'),
+    '#required' => TRUE,
+  );
+
+  $form['kualico_student_course_browser_options'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Course Viewer Options',
+  );
+
+  $form['kualico_student_course_browser_options']['number_of_fields'] = array(
+    '#type' => 'textfield',
+    '#title' => 'Number of fields',
+    '#default_value' => (!empty(variable_get('number_of_fields')) ? variable_get('number_of_fields') : 1),
+    '#size' => 2,
+    '#maxlength' => 2,
+  );
+
+  $form['kualico_student_course_browser_options']['course_viewer_fields'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Visible fields on course view page',
+    '#prefix' => '<div class="container-inline" id="course_detail_fields">',
+    '#suffix' => '</div>',
+  );
+
+  return system_settings_form($form);
+}
+
+function kualico_student_form_alter(&$form, &$form_state, $form_id) {
+  if($form_id === 'kualico_student_config_form') {
+    $json_object = _kualico_student_hit_api(variable_get('kualico_student_api_url') . '/courses/schema');
+
+    $poop = array();
+    foreach($json_object as $key => $value) {
+      if(!empty($value['label'])) {
+        $poop[$key] = $value['label'];
+      } else {
+        $poop[$key] = $key;
+      }
+    }
+
+    for ($i=1; $i<=variable_get('number_of_fields'); $i++) {
+      $form['kualico_student_course_browser_options']['course_viewer_fields']["details$i"] = array(
+        '#type' => 'fieldset',
+        '#title' => 'Detail ' . $i,
+        '#prefix' => '<div class="conainer-inline">',
+        '#suffix' => '</div>',
+      );
+      $form['kualico_student_course_browser_options']['course_viewer_fields']["details$i"]["label$i"] = array(
+        '#type' => 'textfield',
+        '#title' => 'Label: ',
+        '#size' => 50,
+        '#default_value' => variable_get("label$i"),
+      );
+      $form['kualico_student_course_browser_options']['course_viewer_fields']["details$i"]["flex$i"] = array(
+        '#type' => 'select',
+        '#title' => 'Flex: ',
+        '#options' => $poop,
+        '#default_value' => variable_get("flex$i"),
+      );
+    }
+  }
+}
+
+function _kualico_student_hit_api($url) {
+  $context = array(
+    'http' => array(
+      'method' => 'GET',
+      'header' => 'X-Token:' . variable_get('kualico_student_x_token')
+    )
+  );
+
+  $context = stream_context_create($context);
+  //Hit API and decode it into creatively named $json_object
+  $json_object = json_decode(
+    file_get_contents(
+      $url,
+      false,
+      $context
+    ),
+    TRUE
+  );
+
+  return $json_object;
+}
+
+function kualico_student_config_form_validate($form, &$form_state) {
+  $x_token = $form_state['values']['kualico_student_x_token'];
+  if($x_token === 'View your API-key in your KualiStudent Profile') {
+    form_set_value($form['kualico_student_x_token'], variable_get('kualico_student_x_token'), $form_state);
+  } else if (strlen($x_token) !== 64){
+    form_set_error(
+    'kualico_student_x_token',
+    t('API Key must be 64 characters long'));
+  }
+}
+
+function kualico_student_permission() {
+  return array(
+    'acces kualico_student content' => array(
+      'title' => t('Access content for the Kualico Student module'),
+    )
+  );
+}
+
+function _kualico_student_page() {
+  $rows = array();
+  $row = array();
+  $output = array();
+  $header = array(
+    'Subject Code',
+    'Course Number',
+    'Course Name',
+  );
+
+  $json_object = _kualico_student_hit_api(variable_get('kualico_student_api_url') . '/courses');
+
+  //GENERATE THE TABLE
+  foreach($json_object as $course) {
+    if (!empty($course['status'])) {
+      if ($course['status'] === 'approved'
+        && !empty($course['subjectCode'])
+        && !empty($course['number'])
+        && !empty($course['title'])) {
+
+        $row['subjectCode'] = $course['subjectCode'];
+        $row['number'] = $course['number'];
+        $row['title'] = l($course['title'], 'kualico_student_course_view', array(
+          'query' => array(
+            'courseID' => $course['id'],
+          )
+          )
+        );
+
+        array_push($rows, $row);
+      }
+    }
+  }
+
+  $table = array(
+    'header' => $header,
+    'rows' => $rows,
+    );
+
+  if (isset($_GET['filter_table'])) {
+    if ($_GET['filter_table']) {
+      $table['rows'] = array_filter($table['rows'],
+       'kualico_student_apply_filter');
+    }
+  }
+ if($table['rows']) {
+    $per_page = variable_get('results_per_page', 15);
+    $current_page = pager_default_initialize(count($table['rows']), $per_page);
+    $chunks = array_chunk($table['rows'], $per_page, TRUE);
+    $table['rows'] = $chunks[$current_page];
+  }
+
+  $filter_form = (drupal_get_form('kualico_student_filter_form'));
+  $output['kualico_student_arguments'] = drupal_render($filter_form);
+
+  if (empty($output)) {
+    $output['kualico_student_arguments'] .= array(
+      //No courses found
+      '#title' => t('Browse Courses'),
+      '#markup' => t('No courses available.'),
+    );
+    return $output['kualico_student_arguments'];
+  } else {
+    $output['kualico_student_arguments'] .= theme('table', $table);
+    $output['kualico_student_arguments'] .= theme('pager', array('quantity', count($rows)));
+  }
+
+  return $output['kualico_student_arguments'];
+}
+
+function kualico_student_filter_form($form, &$form_state) {
+  $form['filters'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Filter Courses',
+  );
+
+  $form['filters']['subject_code_filter'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Subject Code'),
+    '#size' => 15,
+    '#default_value' => (isset($_GET['subject_code_filter']) ? $_GET['subject_code_filter'] : ''),
+  );
+
+  $form['filters']['course_number_filter'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Course Number'),
+    '#size' => 15,
+    '#default_value' => (isset($_GET['course_number_filter']) ? $_GET['course_number_filter'] : ''),
+    );
+
+  $form['filters']['course_name_filter'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Course Title'),
+    '#size' => 30,
+    '#default_value' => (isset($_GET['course_name_filter']) ? $_GET['course_name_filter'] : ''),
+    );
+
+  $form['filters']['submit_button'] = array(
+    '#type' => 'submit',
+    '#value' => 'Filter'
+    );
+
+    return $form;
+}
+
+function kualico_student_filter_form_submit($form, $form_state) {
+    $params = array(
+      'query' => array(
+        'filter_table' => TRUE,
+      )
+    );
+  if (!empty($form_state['values']['subject_code_filter'])) {
+    $params['query']['subject_code_filter'] = $form_state['values']['subject_code_filter'];
+  }
+  if (!empty($form_state['values']['course_number_filter'])) {
+    $params['query']['course_number_filter'] = $form_state['values']['course_number_filter'];
+  }
+  if (!empty($form_state['values']['course_name_filter'])) {
+    $params['query']['course_name_filter'] = $form_state['values']['course_name_filter'];
+  }
+
+  drupal_goto(current_path(), $params);
+  drupal_set_message('New filters applied');
+}
+
+function kualico_student_filter_form_validate($form, $form_state) {
+  //PUT FILTER FORM VALIDATION HERE
+}
+
+function kualico_student_apply_filter($row) {
+
+  if (isset($_GET['subject_code_filter'])) {
+    $subject_code = $_GET['subject_code_filter'];
+    if (stripos(strip_tags($row['subjectCode']), $subject_code) === FALSE) {
+      return FALSE;
+    }
+  } if (isset($_GET['course_number_filter'])) {
+    $course_number = $_GET['course_number_filter'];
+    if (stripos(strip_tags($row['number']), $course_number) === FALSE) {
+      return FALSE;
+    }
+  } if (isset($_GET['course_name_filter'])) {
+    $course_title = $_GET['course_name_filter'];
+    if (stripos(strip_tags($row['title']), $course_title) === FALSE) {
+      return FALSE;
+    }
+  }
+  return TRUE;
+}
+
+function _kualico_student_course_view() {
+  $output = array();
+
+  if (isset($_GET['courseID'])) {
+    //Hit API and decode it into creatively named $json_object
+    $json_object = _kualico_student_hit_api(variable_get('kualico_student_api_url') . '/courses/' . $_GET['courseID'] . '?includeSchema=1');
+
+    $output['page'] = "";
+
+    //Set title
+    if(!empty($json_object['subjectCode']['value']
+      && $json_object['number']['value']
+      && $json_object['title']['value'])) {
+      drupal_set_title($json_object['subjectCode']['value'] . '-' . $json_object['number']['value'] . ': ' . $json_object['title']['value']);
+    }
+
+    for($i=1; $i<=variable_get('number_of_fields'); $i++) {
+      $label = variable_get("label$i");
+      $flex = variable_get("flex$i");
+
+
+      if (!empty($json_object[$flex]['value'])) {
+        //Implement per data item display logic here!!!!!
+        if (is_array($json_object[$flex]['value'])) {
+          //If data item is an array, put logic here!
+          if ($json_object[$flex]['schema']['label'] === 'Mode of Delivery'){
+            foreach($json_object[$flex] as $item) {
+              // Get mode of delivery based on ['value'] flex ID
+            }
+          }
+        } else {
+          $output['page'] .= variable_get("label$i") . ': ' . $json_object[$flex]['value'] . "<br /><br />";
+        }
+      }
+    }
+
+    return $output['page'];
+  } else {
+    return 'You need to select a course in the course browser';
+  }
+}
