@@ -23,23 +23,23 @@ function kualico_student_menu() {
     'page arguments' => array('kualico_student_config_form'),
     'access arguments' => array('access administration pages'),
     'type' => MENU_NORMAL_ITEM
-    );
+  );
   $items['kualico_student'] = array(
     'title' => 'KualiCo Student',
     'page callback' => '_kualico_student_page',
     'access arguments' => array('access kualico_student content'),
     'type' => MENU_NORMAL_ITEM, //Will appear in navigation menu
-    );
+  );
   $items['kualico_student_filter_form'] = array(
     'type' => MENU_CALLBACK,
     'page callback' => 'drupal_get_form',
     'page arguments' => array('kualico_student_filter_form')
   );
-  $items['kualico_student/kualico_student_course_view'] = array(
+  $items['kualico_student_course_view'] = array(
     'title' => 'Course View',
     'page callback' => '_kualico_student_course_view',
     'access arguments' => array('acces kualico_student content'),
-    'type' => MENU_CALLBACK,
+    'type' => MENU_SUGGESTED_ITEM,
   );
   return $items;
 }
@@ -49,8 +49,8 @@ function kualico_student_config_form($form, &$form_state) {
     '#type' => 'textfield',
     '#title' => t('API Url'),
     '#default_value' => variable_get(
-      'kualico_student_api_url',
-      'example: http://monsters.cm.kuali.dev/api'
+    'kualico_student_api_url',
+    'example: http://monsters.cm.kuali.dev/api'
     ),
     '#size' => 64,
     '#description' => t('Enter your API URL'),
@@ -193,7 +193,7 @@ function _kualico_student_page() {
           'query' => array(
             'courseID' => $course['id'],
           )
-          )
+        )
         );
 
         array_push($rows, $row);
@@ -204,7 +204,7 @@ function _kualico_student_page() {
   $table = array(
     'header' => $header,
     'rows' => $rows,
-    );
+  );
 
   if (isset($_GET['filter_table'])) {
     if ($_GET['filter_table']) {
@@ -255,29 +255,29 @@ function kualico_student_filter_form($form, &$form_state) {
     '#title' => t('Course Number'),
     '#size' => 15,
     '#default_value' => (isset($_GET['course_number_filter']) ? $_GET['course_number_filter'] : ''),
-    );
+  );
 
   $form['filters']['course_name_filter'] = array(
     '#type' => 'textfield',
     '#title' => t('Course Title'),
     '#size' => 30,
     '#default_value' => (isset($_GET['course_name_filter']) ? $_GET['course_name_filter'] : ''),
-    );
+  );
 
   $form['filters']['submit_button'] = array(
     '#type' => 'submit',
     '#value' => 'Filter'
-    );
+  );
 
     return $form;
 }
 
 function kualico_student_filter_form_submit($form, $form_state) {
     $params = array(
-      'query' => array(
-        'filter_table' => TRUE,
-      )
-    );
+    'query' => array(
+      'filter_table' => TRUE,
+    )
+  );
   if (!empty($form_state['values']['subject_code_filter'])) {
     $params['query']['subject_code_filter'] = $form_state['values']['subject_code_filter'];
   }
