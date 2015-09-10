@@ -1,32 +1,34 @@
 <?php
 /**
   * @file
-  * Module that will import classes from KualiCo Student API
+  * Module to simplify interaction with the KualiCo CM api.
   */
 
 /**
-  * Implements hook_student_menu()
+  * Implements hook_menu()
   *
   */
-function kualico_student_menu() {
+function cm_drupal_menu() {
   $items = array();
 
-  $items['admin/config/content/kualico_student'] = array(
-    'title' => t('KualiCo Student'),
-    'description' => t('Configuration of the KualiCo Student Module'),
+  $items['admin/config/development/cm_drupal'] = array(
+    'title' => t('CM Drupal'),
+    'description' => t('Configuration of the cm drupal module'),
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('kualico_student_config_form'),
+    'page arguments' => array('cm_drupal_config_form'),
     'access arguments' => array('access administration pages'),
-    'type' => MENU_NORMAL_ITEM
+    'type' => MENU_NORMAL_ITEM,
   );
+
+  return $items;
 }
 
-function kualico_student_config_form($form, &$form_state) {
-  $form['kualico_student_api_url'] = array(
+function cm_drupal_config_form($form, &$form_state) {
+  $form['cm_drupal_api_url'] = array(
     '#type' => 'textfield',
     '#title' => t('API Url'),
     '#default_value' => variable_get(
-    'kualico_student_api_url',
+    'cm_drupal_api_url',
     'example: http://monsters.kuali.co/api/cm'
     ),
     '#size' => 64,
@@ -34,11 +36,11 @@ function kualico_student_config_form($form, &$form_state) {
     '#required' => TRUE
   );
 
-  $form['kualico_student_api_key'] = array(
-    '#type' => 'textfield',
+  $form['cm_drupal_api_key'] = array(
+    '#type' => 'textarea',
     '#title' => t('API Key'),
     '#default_value' => t('Manage your API-keys in your KualiCo Auth Profile'),
-    '#size' => 250,
+    '#size' => 64,
     '#maxlength' => 200,
     '#description' => t('Enter your API key'),
     '#required' => TRUE,
@@ -58,18 +60,19 @@ function kualico_student_config_form($form, &$form_state) {
   * @param body
   * Payload to send with request. Default to none
   */
-function kualico_student_ajax($url, $method = 'GET', $body = null) {
+function cm_drupal_ajax($url, $method = 'GET', $body = null) {
+  $url = _cm_drupal_cleanse_url($url);
   $context = array(
     'http' => array(
       'method' => $method,
-      'header' => 'Authorization: Bearer' . variable_get('kualico_student_api_key'),
+      'header' => 'Authorization: Bearer ' . variable_get('cm_drupal_api_key'),
       'body' => $body
     )
   );
   $context = stream_context_create($context);
   $response = json_decode(
     file_get_contents(
-      variable_get('kualico_student_api_url') . $url,
+      variable_get('cm_drupal_api_url') . $url,
       false,
       $context
     ),
@@ -80,13 +83,14 @@ function kualico_student_ajax($url, $method = 'GET', $body = null) {
 }
 
 /**
-  * Send a 'GET' request
+  * Prepares url for request
   *
   * @param url
-  * Url to hit.
+  * url to cleanse
   */
-function kualico_student_get($url) {
-  return kualico_student_ajax($url, 'GET');
+function _cm_drupal_cleanse_url($url) {
+  $url = substr($url, 1) == '/' ? substr($url, strlen($url) - 1) : $url;
+  return $url;
 }
 
 /**
@@ -95,28 +99,38 @@ function kualico_student_get($url) {
   * @param url
   * Url to hit.
   */
-function kualico_student_post($url, $body) {
-  return kualico_student_ajax($url, 'POST', $body);
+function cm_drupal_get($url) {
+  return cm_drupal_ajax($url, 'GET');
 }
 
 /**
-  * Send a 'GET' request
+  * Send a 'POST' request
   *
   * @param url
   * Url to hit.
   */
-function kualico_student_put($url, $body) {
-  return kualico_student_ajax($url, 'PUT', $body);
+function cm_drupal_post($url, $body) {
+  return cm_drupal_ajax($url, 'POST', $body);
 }
 
 /**
-  * Send a 'GET' request
+  * Send a 'PUT' request
   *
   * @param url
   * Url to hit.
   */
-function kualico_student_delete($url, $body) {
-  return kualico_student_ajax($url, 'DELETE', $body);
+function cm_drupal_put($url, $body) {
+  return cm_drupal_ajax($url, 'PUT', $body);
+}
+
+/**
+  * Send a 'DELETE' request
+  *
+  * @param url
+  * Url to hit.
+  */
+function cm_drupal_delete($url, $body) {
+  return cm_drupal_ajax($url, 'DELETE', $body);
 }
 
 /**
@@ -128,25 +142,25 @@ function kualico_student_delete($url, $body) {
   * @param form_state
   * State of the form to be validated.
   */
-function kualico_student_config_form_validate($form, &$form_state) {
-  $api_key = $form_state['values']['kualico_student_api_key'];
-  $api_url = $form_state['values']['kualico_student_api_url'];
+function cm_drupal_config_form_validate($form, &$form_state) {
+  $api_key = $form_state['values']['cm_drupal_api_key'];
+  $api_url = $form_state['values']['cm_drupal_api_url'];
   if($api_key === t('Manage your API-keys in your KualiCo Auth Profile')) {
-    form_set_value($form['kualico_student_api_key'], variable_get('kualico_student_api_key', '####NOT A REAL KEY####'), $form_state);
-  } else if (!_kualico_student_validate_api_key($form_state)){
+    form_set_value($form['cm_drupal_api_key'], variable_get('cm_drupal_api_key', '####NOT A REAL KEY####'), $form_state);
+  } else if (!_cm_drupal_validate_api_key($form_state)){
     form_set_error(
-    'kualico_student_api_key',
+    'cm_drupal_api_key',
     t('API Key must follow the format: [random characters].[random characters].[random characters]'));
   }
   if (substr($api_url, -1) !== '/') {
     $api_url .= '/';
-    form_set_value($form['kualico_student_api_url'], $api_url, $form_state);
+    form_set_value($form['cm_drupal_api_url'], $api_url, $form_state);
   }
 }
 
-function _kualico_student_validate_api_key(&$form_state) {
+function _cm_drupal_validate_api_key(&$form_state) {
   $regex = '/^\S+[.]\S+[.]\S+$/';
-  return preg_match($regex, $form_state['values']['kualico_student_api_key']);
+  return preg_match($regex, $form_state['values']['cm_drupal_api_key']);
 }
 
 /**
@@ -158,9 +172,9 @@ function _kualico_student_validate_api_key(&$form_state) {
   * @param arg
   * Array that holds the current path as returned from arg() function
   */
-function kualico_student_permission() {
+function cm_drupal_permission() {
   return array(
-    'acces kualico_student content' => array(
+    'acces cm_drupal content' => array(
       'title' => t('Access content for the Kualico Student module'),
     )
   );

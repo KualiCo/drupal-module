@@ -1,0 +1,5 @@
+name = CM Drupal
+description = Module to simplify interaction with the KualiCo CM api.
+core = 7.x
+package = API
+configure = admin/config/development/cm_drupal

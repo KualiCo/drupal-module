@@ -1,5 +1,0 @@
-name = KualiCo Student
-description = Module that will import classes from KualiCo Student API
-core = 7.x
-; NEW LINE
-configure = admin/config/content/kualico_student
