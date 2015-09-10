@@ -1,53 +1,25 @@
 <?php
 /**
   * @file
-  * Module to simplify interaction with the KualiCo CM api.
-  */
-
-/**
-  * Implements hook_menu()
+  * Module to simplify interaction with
+  * the KualiCo CM api. Patterned loosely
+  * after the jQuery ajax functionality
+  * the basic usage is as follows:
+  * This module exposes five externally useful functions.
+  * Four of them are the basic types of requests
+  * that the CM API accepts namely:
+  * cm_drupal_get($url)
+  * cm_drupal_post($url [,$body = null])
+  * cm_drupal_put($url [,$body = null])
+  * cm_drupal_delete($url [,$body = null])
   *
+  * The fifth is a basic ajax method where the request
+  * type is specified in the parameters:
+  * cm_drupal_ajax($url [, $method = 'GET', $body = null])
+  *
+  * Each function returns the JSON response from the
+  * server.
   */
-function cm_drupal_menu() {
-  $items = array();
-
-  $items['admin/config/development/cm_drupal'] = array(
-    'title' => t('CM Drupal'),
-    'description' => t('Configuration of the cm drupal module'),
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('cm_drupal_config_form'),
-    'access arguments' => array('access administration pages'),
-    'type' => MENU_NORMAL_ITEM,
-  );
-
-  return $items;
-}
-
-function cm_drupal_config_form($form, &$form_state) {
-  $form['cm_drupal_api_url'] = array(
-    '#type' => 'textfield',
-    '#title' => t('API Url'),
-    '#default_value' => variable_get(
-    'cm_drupal_api_url',
-    'example: http://monsters.kuali.co/api/cm'
-    ),
-    '#size' => 64,
-    '#description' => t('Enter your API URL'),
-    '#required' => TRUE
-  );
-
-  $form['cm_drupal_api_key'] = array(
-    '#type' => 'textarea',
-    '#title' => t('API Key'),
-    '#default_value' => t('Manage your API-keys in your KualiCo Auth Profile'),
-    '#size' => 64,
-    '#maxlength' => 200,
-    '#description' => t('Enter your API key'),
-    '#required' => TRUE,
-  );
-
-  return system_settings_form($form);
-}
 
 /**
   * Hit api based on provided config values
@@ -80,17 +52,6 @@ function cm_drupal_ajax($url, $method = 'GET', $body = null) {
   );
 
   return $response;
-}
-
-/**
-  * Prepares url for request
-  *
-  * @param url
-  * url to cleanse
-  */
-function _cm_drupal_cleanse_url($url) {
-  $url = substr($url, 1) == '/' ? substr($url, strlen($url) - 1) : $url;
-  return $url;
 }
 
 /**
@@ -132,6 +93,60 @@ function cm_drupal_put($url, $body) {
 function cm_drupal_delete($url, $body) {
   return cm_drupal_ajax($url, 'DELETE', $body);
 }
+
+/**
+  * Prepares url for request
+  *
+  * @param url
+  * url to cleanse
+  */
+function _cm_drupal_cleanse_url($url) {
+  $url = substr($url, 1) == '/' ? substr($url, strlen($url) - 1) : $url;
+  return $url;
+}
+
+/**
+  * Implements hook_menu()
+  *
+  */
+function cm_drupal_menu() {
+  $items = array();
+  $items['admin/config/development/cm_drupal'] = array(
+    'title' => t('CM Drupal'),
+    'description' => t('Configuration of the cm drupal module'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('cm_drupal_config_form'),
+    'access arguments' => array('access administration pages'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+
+function cm_drupal_config_form($form, &$form_state) {
+  $form['cm_drupal_api_url'] = array(
+    '#type' => 'textfield',
+    '#title' => t('API Url'),
+    '#default_value' => variable_get(
+    'cm_drupal_api_url',
+    'example: http://monsters.kuali.co/api/cm'
+    ),
+    '#size' => 64,
+    '#description' => t('Enter your API URL'),
+    '#required' => TRUE
+  );
+
+  $form['cm_drupal_api_key'] = array(
+    '#type' => 'textarea',
+    '#title' => t('API Key'),
+    '#default_value' => t('Manage your API-keys in your KualiCo Auth Profile'),
+    '#size' => 64,
+    '#maxlength' => 200,
+    '#description' => t('Enter your API key'),
+    '#required' => TRUE,
+  );
+  return system_settings_form($form);
+}
+
 
 /**
   * Implements form_validate()
