@@ -16,3 +16,9 @@ cm_drupal_ajax($url [, $method = 'GET', $body = null])
 
 Each function returns the JSON response from the
 server.
+
+# Installation
+
+Copy cm_drupal.info and cm_drupal.module to $yourdrupalpath/sites/all/modules/cm_drupal
+
+Clear your caches and enable the module in the Drupal administration>modules page.
