@@ -22,3 +22,5 @@ server.
 Copy cm_drupal.info and cm_drupal.module to $yourdrupalpath/sites/all/modules/cm_drupal
 
 Clear your caches and enable the module in the Drupal administration>modules page.
+
+mikec@kuali.co
